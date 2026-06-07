@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.shelfAuth.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.shelfAuth.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: {{ .Values.shelfAuth.name }}
+          image: "{{ .Values.shelfAuth.image.repository }}:{{ .Values.shelfAuth.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.shelfAuth.service.port }}

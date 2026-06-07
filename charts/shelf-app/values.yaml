@@ -1,22 +1,28 @@
 # charts/shelf-app/values.yaml
 
-authCore:
+shelfAuth:
+  name: shelf-auth
   image:
-    repository: shelf-auth-core
+    repository: ghcr.io/slavasuhoveev/shelf-auth
     tag: local
+  replicaCount: 1
   service:
     port: 8080
 
 shelfApi:
+  name: shelf-api
   image:
-    repository: shelf-api
+    repository: ghcr.io/slavasuhoveev/shelf-api
     tag: local
+  replicaCount: 1
   service:
     port: 8082
 
 shelfFront:
+  name: shelf-front
   image:
-    repository: shelf-front
+    repository: ghcr.io/slavasuhoveev/shelf-front
     tag: local
+  replicaCount: 1
   service:
     port: 3000

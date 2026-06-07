@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.shelfFront.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.shelfFront.name }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.shelfFront.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.shelfFront.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.shelfFront.name }}
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: {{ .Values.shelfFront.name }}
+          image: "{{ .Values.shelfFront.image.repository }}:{{ .Values.shelfFront.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.shelfFront.service.port }}
