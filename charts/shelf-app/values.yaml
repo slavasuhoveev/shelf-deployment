@@ -1,0 +1,22 @@
+# charts/shelf-app/values.yaml
+
+authCore:
+  image:
+    repository: shelf-auth-core
+    tag: local
+  service:
+    port: 8080
+
+shelfApi:
+  image:
+    repository: shelf-api
+    tag: local
+  service:
+    port: 8082
+
+shelfFront:
+  image:
+    repository: shelf-front
+    tag: local
+  service:
+    port: 3000
