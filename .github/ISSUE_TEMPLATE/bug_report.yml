@@ -1,0 +1,84 @@
+name: Bug report
+description: Report an unexpected behavior or problem
+title: "[Bug]: "
+labels: ["type:bug"]
+assignees: []
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Briefly describe the bug.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected area
+      description: Which part of the deployment is affected?
+      options:
+        - Helm chart
+        - Local environment
+        - Kubernetes deployment
+        - CI/CD
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce the issue?
+      placeholder: |
+        1. Go to ...
+        2. Click on ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+      placeholder: The system...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+      placeholder: The system should...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant logs, error messages, screenshots, or command output.
+      render: shell
+      placeholder: |
+        Paste logs here.
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Provide details about your environment.
+      placeholder: |
+        - OS:
+        - Docker/Compose version:
+        - Kubernetes version:
+        - Helm version:
+        - Chart/app version:
+    validations:
+      required: true
