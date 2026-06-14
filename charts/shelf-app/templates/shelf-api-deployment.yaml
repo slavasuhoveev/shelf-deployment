@@ -27,3 +27,15 @@ spec:
         - name: {{ $key }}
           value: {{ $value | quote }}
         {{- end }}
+      readinessProbe:
+        httpGet:
+          path: {{ .Values.shelfApi.probes.readiness.path }}
+          port: {{ .Values.shelfApi.service.port }}
+        initialDelaySeconds: {{ .Values.shelfApi.probes.readiness.initialDelaySeconds }}
+        periodSeconds: {{ .Values.shelfApi.probes.readiness.periodSeconds }}
+      livenessProbe:
+        httpGet:
+          path: {{ .Values.shelfApi.probes.liveness.path }}
+          port: {{ .Values.shelfApi.service.port }}
+        initialDelaySeconds: {{ .Values.shelfApi.probes.liveness.initialDelaySeconds }}
+        periodSeconds: {{ .Values.shelfApi.probes.liveness.periodSeconds }}

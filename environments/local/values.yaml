@@ -5,12 +5,15 @@ global:
 
 shelfAuth:
   image:
-    tag: local
+    tag: develop
 
 shelfApi:
   image:
-    tag: local
+    tag: develop
 
 shelfFront:
   image:
-    tag: local
+    tag: develop
+  env:
+    NEXT_PUBLIC_AUTH_API_URL: http://localhost:8081
+    NEXT_PUBLIC_SHELF_API_URL: http://localhost:8082

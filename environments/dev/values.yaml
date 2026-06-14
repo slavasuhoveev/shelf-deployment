@@ -6,15 +6,15 @@ global:
 shelfAuth:
   replicaCount: 2
   image:
-    tag: 123abc456
-
-  image:
-    tag: local
+    tag: latest
 
 shelfApi:
   image:
-    tag: local
+    tag: latest
 
 shelfFront:
   image:
-    tag: local
+    tag: latest
+  env:
+    NEXT_PUBLIC_AUTH_API_URL: http://shelf.auth.dev
+    NEXT_PUBLIC_SHELF_API_URL: http://shelf.api.dev
