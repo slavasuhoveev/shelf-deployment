@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.shelfAuth.name }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.global.namespace }}
   labels:
     app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
     app.kubernetes.io/component: backend
@@ -22,3 +22,8 @@ spec:
           image: "{{ .Values.shelfAuth.image.repository }}:{{ .Values.shelfAuth.image.tag }}"
           ports:
             - containerPort: {{ .Values.shelfAuth.service.port }}
+      env:
+        {{- range $key, $value := .Values.shelfAuth.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}

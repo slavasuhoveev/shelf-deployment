@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Values.shelfAuth.name }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.global.namespace }}
 spec:
   selector:
     app.kubernetes.io/name: {{ .Values.shelfAuth.name }}

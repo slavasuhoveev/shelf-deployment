@@ -1,0 +1,16 @@
+# environments/local/values.yaml
+
+global:
+  namespace: shelf-local
+
+shelfAuth:
+  image:
+    tag: local
+
+shelfApi:
+  image:
+    tag: local
+
+shelfFront:
+  image:
+    tag: local

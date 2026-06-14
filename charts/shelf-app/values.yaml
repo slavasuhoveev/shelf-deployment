@@ -1,11 +1,16 @@
 # charts/shelf-app/values.yaml
 
+global:
+  namespace: default
+
 shelfAuth:
   name: shelf-auth
   image:
     repository: ghcr.io/slavasuhoveev/shelf-auth
     tag: local
   replicaCount: 1
+  env:
+    LOG_LEVEL: debug
   service:
     port: 8080
 
@@ -15,6 +20,8 @@ shelfApi:
     repository: ghcr.io/slavasuhoveev/shelf-api
     tag: local
   replicaCount: 1
+  env:
+    AUTH_JWKS_URL: http://shelf-auth:8080/.well-known/jwks.json
   service:
     port: 8082
 
@@ -24,5 +31,8 @@ shelfFront:
     repository: ghcr.io/slavasuhoveev/shelf-front
     tag: local
   replicaCount: 1
+  env:
+    NEXT_PUBLIC_AUTH_API_URL: http://shelf-auth:8080
+    NEXT_PUBLIC_SHELF_API_URL: http://shelf-api:8082
   service:
     port: 3000

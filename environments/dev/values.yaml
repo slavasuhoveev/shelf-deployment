@@ -1,0 +1,20 @@
+# environments/dev/values.yaml
+
+global:
+  namespace: shelf-dev
+
+shelfAuth:
+  replicaCount: 2
+  image:
+    tag: 123abc456
+
+  image:
+    tag: local
+
+shelfApi:
+  image:
+    tag: local
+
+shelfFront:
+  image:
+    tag: local
