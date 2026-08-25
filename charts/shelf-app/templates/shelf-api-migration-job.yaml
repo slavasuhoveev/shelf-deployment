@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: {{ .Values.shelfApi.name }}-migrate
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.shelfApi.name }}
+    app.kubernetes.io/component: migration
+
+spec:
+  backoffLimit: 3
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.shelfApi.name }}
+        app.kubernetes.io/component: migration
+
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: {{ .Values.shelfApi.name }}-migrate
+          image: "{{ .Values.shelfApi.image.repository }}:{{ .Values.shelfApi.image.tag }}"
+          imagePullPolicy: {{ .Values.shelfApi.image.pullPolicy }}
+
+          command:
+            - alembic
+
+          args:
+            - upgrade
+            - head
+
+          env:
+            {{- range $key, $value := .Values.shelfApi.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
