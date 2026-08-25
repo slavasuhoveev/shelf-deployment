@@ -1,0 +1,19 @@
+# environments/local/values.yaml
+
+global:
+  namespace: shelf-local
+
+shelfAuth:
+  image:
+    tag: develop
+
+shelfApi:
+  image:
+    tag: develop
+
+shelfFront:
+  image:
+    tag: develop
+  env:
+    NEXT_PUBLIC_AUTH_API_URL: http://localhost:8081
+    NEXT_PUBLIC_SHELF_API_URL: http://localhost:8082

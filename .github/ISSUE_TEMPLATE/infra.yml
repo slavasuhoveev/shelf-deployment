@@ -1,0 +1,94 @@
+name: Infrastructure
+description: DevOps, CI/CD, Docker, deployment, or environment configuration task
+title: "[Infra]: "
+labels: ["type:infra"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Infrastructure Task
+
+        Task related to deployment, CI/CD, environment setup,
+        containerization, or platform configuration.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What kind of infrastructure work is this?
+      options:
+        - Helm chart
+        - Docker
+        - Kubernetes
+        - CI/CD
+        - Environment configuration
+        - Monitoring or observability
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What infrastructure improvement is required?
+      placeholder: |
+        - Add CI pipeline
+        - Improve Docker build
+        - Configure Kubernetes
+        - Add monitoring
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Which services/environments are affected?
+      placeholder: |
+        - shelf-auth
+        - shelf-api
+        - shelf-frontend
+        - production
+        - staging
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical_details
+    attributes:
+      label: Technical details
+      description: Implementation approach or requirements
+      placeholder: |
+        - Tools involved:
+        - Configuration changes:
+        - Dependencies:
+    validations:
+      required: false
+
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback plan
+      description: How can this change be reverted or mitigated if it fails?
+      placeholder: |
+        - Revert commit:
+        - Restore previous image/chart:
+        - Disable feature/config:
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Verification checklist
+      options:
+        - label: Local environment tested
+          required: true
+        - label: Build succeeds
+          required: true
+        - label: Deployment tested (if applicable)
+          required: false
+        - label: No service downtime introduced
+          required: false

@@ -1,0 +1,8 @@
+# charts/shelf-app/Chart.yaml
+
+apiVersion: v2
+name: shelf-app
+description: Helm chart for Shelf application
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

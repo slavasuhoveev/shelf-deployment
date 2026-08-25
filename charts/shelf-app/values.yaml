@@ -1,0 +1,62 @@
+# charts/shelf-app/values.yaml
+
+global:
+  namespace: default
+
+shelfAuth:
+  name: shelf-auth
+  image:
+    repository: ghcr.io/slavasuhoveev/shelf-auth
+    tag: latest
+  replicaCount: 1
+  env:
+    LOG_LEVEL: debug
+  service:
+    port: 8080
+  probes:
+    readiness:
+      path: /readyz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 15
+      periodSeconds: 20
+
+shelfApi:
+  name: shelf-api
+  image:
+    repository: ghcr.io/slavasuhoveev/shelf-api
+    tag: latest
+  replicaCount: 1
+  env:
+    AUTH_JWKS_URL: http://shelf-auth:8080/.well-known/jwks.json
+  service:
+    port: 8082
+  probes:
+    readiness:
+      path: /readyz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 15
+      periodSeconds: 20
+
+shelfFront:
+  name: shelf-front
+  image:
+    repository: ghcr.io/slavasuhoveev/shelf-front
+    tag: latest
+  replicaCount: 1
+  service:
+    port: 3000
+  probes:
+    readiness:
+      path: /api/healthz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      path: /api/healthz
+      initialDelaySeconds: 15
+      periodSeconds: 20

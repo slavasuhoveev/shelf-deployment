@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.shelfAuth.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.shelfAuth.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: {{ .Values.shelfAuth.name }}
+          image: "{{ .Values.shelfAuth.image.repository }}:{{ .Values.shelfAuth.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.shelfAuth.service.port }}
+      env:
+        {{- range $key, $value := .Values.shelfAuth.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+      readinessProbe:
+        httpGet:
+          path: {{ .Values.shelfAuth.probes.readiness.path }}
+          port: {{ .Values.shelfAuth.service.port }}
+        initialDelaySeconds: {{ .Values.shelfAuth.probes.readiness.initialDelaySeconds }}
+        periodSeconds: {{ .Values.shelfAuth.probes.readiness.periodSeconds }}
+      livenessProbe:
+        httpGet:
+          path: {{ .Values.shelfAuth.probes.liveness.path }}
+          port: {{ .Values.shelfAuth.service.port }}
+        initialDelaySeconds: {{ .Values.shelfAuth.probes.liveness.initialDelaySeconds }}
+        periodSeconds: {{ .Values.shelfAuth.probes.liveness.periodSeconds }}

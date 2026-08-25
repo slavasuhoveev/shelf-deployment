@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.shelfApi.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.shelfApi.name }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.shelfApi.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.shelfApi.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.shelfApi.name }}
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: {{ .Values.shelfApi.name }}
+          image: "{{ .Values.shelfApi.image.repository }}:{{ .Values.shelfApi.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.shelfApi.service.port }}
+      env:
+        {{- range $key, $value := .Values.shelfApi.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+      readinessProbe:
+        httpGet:
+          path: {{ .Values.shelfApi.probes.readiness.path }}
+          port: {{ .Values.shelfApi.service.port }}
+        initialDelaySeconds: {{ .Values.shelfApi.probes.readiness.initialDelaySeconds }}
+        periodSeconds: {{ .Values.shelfApi.probes.readiness.periodSeconds }}
+      livenessProbe:
+        httpGet:
+          path: {{ .Values.shelfApi.probes.liveness.path }}
+          port: {{ .Values.shelfApi.service.port }}
+        initialDelaySeconds: {{ .Values.shelfApi.probes.liveness.initialDelaySeconds }}
+        periodSeconds: {{ .Values.shelfApi.probes.liveness.periodSeconds }}
