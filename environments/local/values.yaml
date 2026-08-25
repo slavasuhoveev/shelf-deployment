@@ -6,14 +6,20 @@ global:
 shelfAuth:
   image:
     tag: develop
+    pullPolicy: IfNotPresent
 
 shelfApi:
   image:
     tag: develop
+    pullPolicy: IfNotPresent
 
 shelfFront:
   image:
     tag: develop
+    pullPolicy: IfNotPresent
   env:
     NEXT_PUBLIC_AUTH_API_URL: http://localhost:8081
     NEXT_PUBLIC_SHELF_API_URL: http://localhost:8082
+
+ingress:
+  enabled: false

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: {{ .Values.shelfAuthDb.name }}
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  selector:
+    app.kubernetes.io/name: {{ .Values.shelfAuthDb.name }}
+
+  ports:
+    - name: postgres
+      port: {{ .Values.shelfAuthDb.service.port }}
+      targetPort: {{ .Values.shelfAuthDb.service.port }}

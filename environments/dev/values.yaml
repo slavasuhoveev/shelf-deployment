@@ -18,3 +18,10 @@ shelfFront:
   env:
     NEXT_PUBLIC_AUTH_API_URL: http://shelf.auth.dev
     NEXT_PUBLIC_SHELF_API_URL: http://shelf.api.dev
+
+ingress:
+  enabled: true
+
+  frontHost: shelf.dev
+  authHost: shelf.auth.dev
+  apiHost: shelf.api.dev

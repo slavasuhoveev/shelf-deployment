@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: {{ .Values.shelfAuth.name }}-migrate
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+    app.kubernetes.io/component: migration
+
+spec:
+  backoffLimit: 3
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.shelfAuth.name }}
+        app.kubernetes.io/component: migration
+
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: {{ .Values.shelfAuth.name }}-migrate
+          image: "{{ .Values.shelfAuth.image.repository }}:{{ .Values.shelfAuth.image.tag }}"
+          imagePullPolicy: {{ .Values.shelfAuth.image.pullPolicy }}
+
+          command:
+            - migrate
+
+          args:
+            - "-path=/migrations"
+            - "-database={{ .Values.shelfAuth.migration.databaseUrl }}"
+            - "up"
+
+          env:
+            {{- range $key, $value := .Values.shelfAuth.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
