@@ -5,6 +5,10 @@ kind: Ingress
 metadata:
   name: shelf-app
   namespace: {{ .Values.global.namespace }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 
 spec:
   ingressClassName: {{ .Values.ingress.className }}

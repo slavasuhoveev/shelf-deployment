@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     app.kubernetes.io/name: {{ .Values.shelfApi.name }}
-    app.kubernetes.io/component: backend
+    app.kubernetes.io/component: api
 
 spec:
   replicas: {{ .Values.shelfApi.replicaCount }}
@@ -19,11 +19,12 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .Values.shelfApi.name }}
-        app.kubernetes.io/component: backend
+        app.kubernetes.io/component: api
 
     spec:
       containers:
         - name: {{ .Values.shelfApi.name }}
+
           image: "{{ .Values.shelfApi.image.repository }}:{{ .Values.shelfApi.image.tag }}"
           imagePullPolicy: {{ .Values.shelfApi.image.pullPolicy }}
 
@@ -35,6 +36,17 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+
+            {{- range $key, $value := .Values.shelfApi.secretEnv }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.secretName }}
+                  key: {{ $value.key }}
+            {{- end }}
+
+          resources:
+            {{- toYaml .Values.shelfApi.resources | nindent 12 }}
 
           readinessProbe:
             httpGet:

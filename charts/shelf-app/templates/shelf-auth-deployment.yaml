@@ -24,16 +24,28 @@ spec:
     spec:
       containers:
         - name: {{ .Values.shelfAuth.name }}
+
           image: "{{ .Values.shelfAuth.image.repository }}:{{ .Values.shelfAuth.image.tag }}"
           imagePullPolicy: {{ .Values.shelfAuth.image.pullPolicy }}
 
           ports:
             - containerPort: {{ .Values.shelfAuth.service.port }}
 
+          resources:
+            {{- toYaml .Values.shelfAuth.resources | nindent 12 }}
+
           env:
             {{- range $key, $value := .Values.shelfAuth.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
+            {{- end }}
+
+            {{- range $key, $value := .Values.shelfAuth.secretEnv }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.secretName }}
+                  key: {{ $value.key }}
             {{- end }}
 
           volumeMounts:
@@ -54,6 +66,7 @@ spec:
               port: {{ .Values.shelfAuth.service.port }}
             initialDelaySeconds: {{ .Values.shelfAuth.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.shelfAuth.probes.liveness.periodSeconds }}
+
       volumes:
         - name: signing-keys
           secret:

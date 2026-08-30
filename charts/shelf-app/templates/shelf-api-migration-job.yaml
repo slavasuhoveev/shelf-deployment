@@ -1,3 +1,5 @@
+{{- if .Values.shelfApi.migration.enabled }}
+
 apiVersion: batch/v1
 kind: Job
 
@@ -22,6 +24,7 @@ spec:
 
       containers:
         - name: {{ .Values.shelfApi.name }}-migrate
+
           image: "{{ .Values.shelfApi.image.repository }}:{{ .Values.shelfApi.image.tag }}"
           imagePullPolicy: {{ .Values.shelfApi.image.pullPolicy }}
 
@@ -37,3 +40,13 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+
+            {{- range $key, $value := .Values.shelfApi.secretEnv }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.secretName }}
+                  key: {{ $value.key }}
+            {{- end }}
+
+{{- end }}
