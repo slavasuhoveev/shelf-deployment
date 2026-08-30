@@ -10,28 +10,26 @@ shelfAuth:
     tag: latest
     pullPolicy: Always
   replicaCount: 1
+  resources: {}
   env:
     ENV: dev
     HTTP_ADDR: ":8080"
     LOG_LEVEL: debug
-
     JWT_ALG: RS256
     JWT_ISS: shelf-auth
     JWT_AUD: shelf-api
-
     ACCESS_TTL: 15m
     JWKS_MAX_AGE: 300s
-
     KEYS_DIR: /run/secrets/keys
     SIGNING_KEY_KID: k1-2025-08-30
-
-    DATABASE_URL: postgres://shelf:shelf@shelf-auth-db:5432/shelf_db?sslmode=disable
-
     CORS_ORIGINS: http://localhost:3000
-
     COOKIE_SECURE: "false"
     COOKIE_SAMESITE: Lax
     COOKIE_DOMAIN: ""
+  # Environment variables that must come from Kubernetes Secrets.
+  # Empty by default so the local environment can continue using
+  # the existing plain env configuration.
+  secretEnv: {}
   service:
     port: 8080
   probes:
@@ -45,22 +43,18 @@ shelfAuth:
       periodSeconds: 20
   migration:
     enabled: true
-    databaseUrl: postgres://shelf:shelf@shelf-auth-db:5432/shelf_db?sslmode=disable
 
 shelfAuthDb:
+  enabled: true
   name: shelf-auth-db
-
   image:
     repository: postgres
     tag: 16-alpine
     pullPolicy: IfNotPresent
-
   service:
     port: 5432
-
   storage:
     size: 1Gi
-
   env:
     POSTGRES_USER: shelf
     POSTGRES_PASSWORD: shelf
@@ -73,18 +67,16 @@ shelfApi:
     tag: latest
     pullPolicy: Always
   replicaCount: 1
+  resources: {}
   env:
     AUTH_JWKS_URL: http://shelf-auth:8080/.well-known/jwks.json
-
     JWT_ISSUER: shelf-auth
     JWT_AUDIENCE: shelf-api
     JWKS_CACHE_TTL_SECONDS: 300
-
-    POSTGRES_USER: shelf
-    POSTGRES_PASSWORD: shelf
-    POSTGRES_DB: shelf_db
-    POSTGRES_HOST: shelf-api-db
-    POSTGRES_PORT: 5432
+  # Environment variables that must come from Kubernetes Secrets.
+  # Empty by default so the local environment can continue using
+  # the existing plain env configuration.
+  secretEnv: {}
   service:
     port: 8082
   probes:
@@ -100,19 +92,16 @@ shelfApi:
     enabled: true
 
 shelfApiDb:
+  enabled: true
   name: shelf-api-db
-
   image:
     repository: postgres
     tag: 16-alpine
     pullPolicy: IfNotPresent
-
   service:
     port: 5432
-
   storage:
     size: 1Gi
-
   env:
     POSTGRES_USER: shelf
     POSTGRES_PASSWORD: shelf
@@ -125,6 +114,7 @@ shelfFront:
     tag: latest
     pullPolicy: Always
   replicaCount: 1
+  resources: {}
   service:
     port: 3000
   probes:
@@ -140,7 +130,6 @@ shelfFront:
 ingress:
   enabled: true
   className: nginx
-
   frontHost: front.shelf.local
   authHost: auth.shelf.local
   apiHost: api.shelf.local

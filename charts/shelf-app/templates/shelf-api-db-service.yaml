@@ -1,3 +1,5 @@
+{{- if .Values.shelfApiDb.enabled }}
+
 apiVersion: v1
 kind: Service
 
@@ -13,3 +15,4 @@ spec:
     - name: postgres
       port: {{ .Values.shelfApiDb.service.port }}
       targetPort: {{ .Values.shelfApiDb.service.port }}
+{{- end }}

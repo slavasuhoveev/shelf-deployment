@@ -1,3 +1,5 @@
+{{- if .Values.shelfAuth.migration.enabled }}
+
 apiVersion: batch/v1
 kind: Job
 
@@ -22,6 +24,7 @@ spec:
 
       containers:
         - name: {{ .Values.shelfAuth.name }}-migrate
+
           image: "{{ .Values.shelfAuth.image.repository }}:{{ .Values.shelfAuth.image.tag }}"
           imagePullPolicy: {{ .Values.shelfAuth.image.pullPolicy }}
 
@@ -29,12 +32,22 @@ spec:
             - migrate
 
           args:
-            - "-path=/migrations"
-            - "-database={{ .Values.shelfAuth.migration.databaseUrl }}"
-            - "up"
+            - -path=/migrations
+            - -database=$(DATABASE_URL)
+            - up
 
           env:
             {{- range $key, $value := .Values.shelfAuth.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+
+            {{- range $key, $value := .Values.shelfAuth.secretEnv }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $value.secretName }}
+                  key: {{ $value.key }}
+            {{- end }}
+
+{{- end }}

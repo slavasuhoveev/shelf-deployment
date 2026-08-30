@@ -1,3 +1,4 @@
+{{- if .Values.shelfAuthDb.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 
@@ -70,3 +71,4 @@ spec:
         resources:
           requests:
             storage: {{ .Values.shelfAuthDb.storage.size }}
+{{- end }}

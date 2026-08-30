@@ -4,24 +4,89 @@ global:
   namespace: shelf-dev
 
 shelfAuth:
+  enabled: true
   replicaCount: 2
   image:
-    tag: latest
+    repository: ghcr.io/slavasuhoveev/shelf-auth
+    tag: 151bf3593759a47166ce0071a828eb7a05fba25d
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    ENV: dev
+    CORS_ORIGINS: https://dev.shelful.club
+    COOKIE_SECURE: "true"
+    COOKIE_SAMESITE: Lax
+    COOKIE_DOMAIN: ""
+  secretEnv:
+    DATABASE_URL:
+      secretName: shelf-auth-secrets
+      key: database-url
+  migration:
+    enabled: true
+
+shelfAuthDb:
+  enabled: false
 
 shelfApi:
+  enabled: true
+  replicaCount: 2
   image:
-    tag: latest
+    repository: ghcr.io/slavasuhoveev/shelf-api
+    tag: b08e48c93b9b4d600e44ae4405752b25ffac7aea
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    POSTGRES_USER: shelf_api_user
+    POSTGRES_DB: shelf_api
+    POSTGRES_PORT: "5432"
+    POSTGRES_HOST: shelful-dev-postgres.c38s482o2bb7.eu-central-1.rds.amazonaws.com
+    CORS_ORIGINS: https://dev.shelful.club
+  secretEnv:
+    POSTGRES_PASSWORD:
+      secretName: shelf-api-secrets
+      key: postgres-password
+  migration:
+    enabled: true
+
+shelfApiDb:
+  enabled: false
 
 shelfFront:
+  enabled: true
+  replicaCount: 2
   image:
-    tag: latest
-  env:
-    NEXT_PUBLIC_AUTH_API_URL: http://shelf.auth.dev
-    NEXT_PUBLIC_SHELF_API_URL: http://shelf.api.dev
+    repository: ghcr.io/slavasuhoveev/shelf-front
+    tag: 874b203f64df2fd165b2c20f849d04bee97c4d00
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 ingress:
   enabled: true
+  className: alb
+  frontHost: dev.shelful.club
+  authHost: auth.dev.shelful.club
+  apiHost: api.dev.shelful.club
 
-  frontHost: shelf.dev
-  authHost: shelf.auth.dev
-  apiHost: shelf.api.dev
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:109537136497:certificate/cf450415-cc64-4f88-be9c-60f28ffc1670

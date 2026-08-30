@@ -7,19 +7,33 @@ shelfAuth:
   image:
     tag: develop
     pullPolicy: IfNotPresent
+    env:
+      ENV: local
+      DATABASE_URL: postgres://shelf:shelf@shelf-auth-db:5432/shelf_db?sslmode=disable
+      CORS_ORIGINS: http://localhost:3000
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: Lax
+      COOKIE_DOMAIN: ""
+
+shelfAuthDb:
+  enabled: true
 
 shelfApi:
   image:
     tag: develop
     pullPolicy: IfNotPresent
+  env:
+    POSTGRES_USER: shelf
+    POSTGRES_PASSWORD: shelf
+    POSTGRES_DB: shelf_db
+    POSTGRES_HOST: shelf-api-db
+    POSTGRES_PORT: "5432"
+    CORS_ORIGINS: http://localhost:3000
 
 shelfFront:
   image:
     tag: develop
     pullPolicy: IfNotPresent
-  env:
-    NEXT_PUBLIC_AUTH_API_URL: http://localhost:8081
-    NEXT_PUBLIC_SHELF_API_URL: http://localhost:8082
 
 ingress:
   enabled: false
