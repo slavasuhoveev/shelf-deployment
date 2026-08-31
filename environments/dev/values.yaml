@@ -68,7 +68,7 @@ shelfFront:
   replicaCount: 2
   image:
     repository: ghcr.io/slavasuhoveev/shelf-front
-    tag: 874b203f64df2fd165b2c20f849d04bee97c4d00
+    tag: b5a0049c7e202140a935a1b16ef6dfcd3530bd91
     pullPolicy: IfNotPresent
   resources:
     requests:
