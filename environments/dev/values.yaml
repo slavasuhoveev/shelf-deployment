@@ -38,7 +38,7 @@ shelfApi:
   replicaCount: 2
   image:
     repository: ghcr.io/slavasuhoveev/shelf-api
-    tag: b08e48c93b9b4d600e44ae4405752b25ffac7aea
+    tag: c39b004dbd15f6ef0838c8cd2d51fccc20dc5ddb
     pullPolicy: IfNotPresent
   resources:
     requests:
