@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: shelf-dev
+  namespace: argocd
+
+spec:
+  project: shelf
+
+  source:
+    repoURL: https://github.com/slavasuhoveev/shelf-deployment.git
+    targetRevision: main
+    path: charts/shelf-app
+
+    helm:
+      valueFiles:
+        - ../../environments/dev/values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shelf-dev
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
