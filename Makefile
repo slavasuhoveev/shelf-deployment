@@ -1,5 +1,5 @@
 # =========================================================
-# Shelf Deployment
+# Shelful Deployment
 # =========================================================
 
 SHELL := /bin/bash
@@ -16,8 +16,20 @@ VALUES ?= ./environments/$(ENV)/values.yaml
 
 NAMESPACE ?= shelf-local
 
+MINIKUBE ?= minikube
 MINIKUBE_PROFILE ?= minikube
 MINIKUBE_DRIVER ?= docker
+KUBECTL ?= kubectl
+HELM ?= helm
+TERRAFORM ?= terraform
+ARGOCD ?= argocd
+
+# Terraform
+TF_DIR ?= ./terraform/environments/dev
+
+# Argo CD
+ARGO_APP ?= shelf-dev
+ARGO_PROJECT ?= shelf
 
 # Local application images
 AUTH_IMAGE ?= ghcr.io/slavasuhoveev/shelf-auth:develop
@@ -48,24 +60,33 @@ help: ## Show available commands
 
 .PHONY: minikube-start
 minikube-start: ## Start Minikube
-	@minikube start \
+	@$(MINIKUBE) start \
 		--profile $(MINIKUBE_PROFILE) \
 		--driver $(MINIKUBE_DRIVER)
 
 
 .PHONY: minikube-stop
 minikube-stop: ## Stop Minikube
-	@minikube stop --profile $(MINIKUBE_PROFILE)
+	@$(MINIKUBE) stop --profile $(MINIKUBE_PROFILE)
 
 
 .PHONY: minikube-delete
 minikube-delete: ## Delete Minikube cluster
-	@minikube delete --profile $(MINIKUBE_PROFILE)
+	@$(MINIKUBE) delete --profile $(MINIKUBE_PROFILE)
 
 
 .PHONY: minikube-status
 minikube-status: ## Show Minikube status
-	@minikube status --profile $(MINIKUBE_PROFILE)
+	@$(MINIKUBE) status --profile $(MINIKUBE_PROFILE)
+
+
+
+# =========================================================
+# Validation
+# =========================================================
+
+.PHONY: check
+check: lint tf-check ## Run all static deployment checks
 
 
 # =========================================================
@@ -74,13 +95,13 @@ minikube-status: ## Show Minikube status
 
 .PHONY: lint
 lint: ## Lint Helm chart
-	@helm lint $(CHART) \
+	@$(HELM) lint $(CHART) \
 		-f $(VALUES)
 
 
 .PHONY: template
 template: ## Render Helm templates
-	@helm template $(RELEASE_NAME) $(CHART) \
+	@$(HELM) template $(RELEASE_NAME) $(CHART) \
 		-f $(VALUES)
 
 
@@ -90,9 +111,9 @@ template: ## Render Helm templates
 
 .PHONY: namespace
 namespace: ## Create namespace if it does not exist
-	@kubectl create namespace $(NAMESPACE) \
+	@$(KUBECTL) create namespace $(NAMESPACE) \
 		--dry-run=client \
-		-o yaml | kubectl apply -f -
+		-o yaml | $(KUBECTL) apply -f -
 
 
 # =========================================================
@@ -100,56 +121,65 @@ namespace: ## Create namespace if it does not exist
 # =========================================================
 
 .PHONY: images-load
-images-load: ## Load all local Shelf images into Minikube
-	@echo "Loading Shelf images into Minikube..."
-	@minikube image load $(AUTH_IMAGE) \
+images-load: ## Load all local Shelful images into Minikube
+	@echo "Loading Shelful images into Minikube..."
+	@$(MINIKUBE) image load $(AUTH_IMAGE) \
 		--profile $(MINIKUBE_PROFILE)
-	@minikube image load $(API_IMAGE) \
+	@$(MINIKUBE) image load $(API_IMAGE) \
 		--profile $(MINIKUBE_PROFILE)
-	@minikube image load $(FRONT_IMAGE) \
+	@$(MINIKUBE) image load $(FRONT_IMAGE) \
 		--profile $(MINIKUBE_PROFILE)
 
 
 .PHONY: images-list
-images-list: ## Show Shelf images available inside Minikube
-	@minikube image ls \
-		--profile $(MINIKUBE_PROFILE) | grep shelf || true
+images-list: ## Show Shelful images available inside Minikube
+	@$(MINIKUBE) image ls \
+		--profile $(MINIKUBE_PROFILE) | grep Shelful || true
 
 
 # =========================================================
 # Helm deployment
 # =========================================================
 
+.PHONY: require-local
+require-local:
+	@if [ "$(ENV)" != "local" ]; then \
+		echo "ERROR: Direct Helm mutations are allowed only for ENV=local."; \
+		echo "Cloud environments must be deployed through Git and Argo CD."; \
+		exit 1; \
+	fi
+
+
 .PHONY: install
-install: namespace lint ## Install Shelf Helm release
-	@helm install $(RELEASE_NAME) $(CHART) \
+install: require-local namespace lint ## Install local Shelful Helm release
+	@$(HELM) install $(RELEASE_NAME) $(CHART) \
 		-f $(VALUES) \
 		--namespace $(NAMESPACE)
 
 
 .PHONY: upgrade
-upgrade: lint ## Upgrade existing Shelf Helm release
-	@helm upgrade $(RELEASE_NAME) $(CHART) \
+upgrade: require-local lint ## Upgrade existing local Shelful Helm release
+	@$(HELM) upgrade $(RELEASE_NAME) $(CHART) \
 		-f $(VALUES) \
 		--namespace $(NAMESPACE)
 
 
 .PHONY: deploy
-deploy: namespace lint ## Install or upgrade Shelf
-	@helm upgrade --install $(RELEASE_NAME) $(CHART) \
+deploy: require-local namespace lint ## Install or upgrade local Shelful
+	@$(HELM) upgrade --install $(RELEASE_NAME) $(CHART) \
 		-f $(VALUES) \
 		--namespace $(NAMESPACE)
 
 
 .PHONY: uninstall
-uninstall: ## Uninstall Shelf Helm release
-	@helm uninstall $(RELEASE_NAME) \
+uninstall: require-local ## Uninstall local Shelful Helm release
+	@$(HELM) uninstall $(RELEASE_NAME) \
 		--namespace $(NAMESPACE)
 
 
 .PHONY: helm-status
 helm-status: ## Show Helm release status
-	@helm status $(RELEASE_NAME) \
+	@$(HELM) status $(RELEASE_NAME) \
 		--namespace $(NAMESPACE)
 
 
@@ -158,51 +188,63 @@ helm-status: ## Show Helm release status
 # =========================================================
 
 .PHONY: status
-status: ## Show Shelf Kubernetes resources
+status: ## Show Shelful Kubernetes resources
 	@echo
 	@echo "=== Pods ==="
-	@kubectl get pods -n $(NAMESPACE)
+	@$(KUBECTL) get pods -n $(NAMESPACE)
 
 	@echo
 	@echo "=== Services ==="
-	@kubectl get services -n $(NAMESPACE)
+	@$(KUBECTL) get services -n $(NAMESPACE)
 
 	@echo
 	@echo "=== Jobs ==="
-	@kubectl get jobs -n $(NAMESPACE)
+	@$(KUBECTL) get jobs -n $(NAMESPACE)
 
 	@echo
 	@echo "=== PVCs ==="
-	@kubectl get pvc -n $(NAMESPACE)
+	@$(KUBECTL) get pvc -n $(NAMESPACE)
 
 	@echo
 	@echo "=== Ingress ==="
-	@kubectl get ingress -n $(NAMESPACE)
+	@$(KUBECTL) get ingress -n $(NAMESPACE)
 
 
 .PHONY: pods
-pods: ## Show Shelf pods
-	@kubectl get pods -n $(NAMESPACE)
+pods: ## Show Shelful pods
+	@$(KUBECTL) get pods -n $(NAMESPACE)
 
 
 .PHONY: pods-watch
-pods-watch: ## Watch Shelf pods
-	@kubectl get pods -n $(NAMESPACE) --watch
+pods-watch: ## Watch Shelful pods
+	@$(KUBECTL) get pods -n $(NAMESPACE) --watch
 
 
 .PHONY: services
-services: ## Show Shelf services
-	@kubectl get services -n $(NAMESPACE)
+services: ## Show Shelful services
+	@$(KUBECTL) get services -n $(NAMESPACE)
 
 
 .PHONY: jobs
 jobs: ## Show migration jobs
-	@kubectl get jobs -n $(NAMESPACE)
+	@$(KUBECTL) get jobs -n $(NAMESPACE)
 
 
 .PHONY: pvc
 pvc: ## Show persistent volume claims
-	@kubectl get pvc -n $(NAMESPACE)
+	@$(KUBECTL) get pvc -n $(NAMESPACE)
+
+
+# =========================================================
+# Kubernetes context
+# =========================================================
+
+.PHONY: context
+context: ## Show current Kubernetes context and namespace
+	@echo "Context:"
+	@$(KUBECTL) config current-context
+	@echo
+	@echo "Namespace: $(NAMESPACE)"
 
 
 # =========================================================
@@ -210,40 +252,40 @@ pvc: ## Show persistent volume claims
 # =========================================================
 
 .PHONY: restart
-restart: ## Restart all Shelf application deployments
-	@kubectl rollout restart deployment/shelf-auth \
+restart: require-local ## Restart all local Shelful application deployments
+	@$(KUBECTL) rollout restart deployment/shelf-auth \
 		-n $(NAMESPACE)
-	@kubectl rollout restart deployment/shelf-api \
+	@$(KUBECTL) rollout restart deployment/shelf-api \
 		-n $(NAMESPACE)
-	@kubectl rollout restart deployment/shelf-front \
+	@$(KUBECTL) rollout restart deployment/shelf-front \
 		-n $(NAMESPACE)
 
 
 .PHONY: restart-auth
-restart-auth: ## Restart shelf-auth
-	@kubectl rollout restart deployment/shelf-auth \
+restart-auth: require-local ## Restart local shelf-auth
+	@$(KUBECTL) rollout restart deployment/shelf-auth \
 		-n $(NAMESPACE)
 
 
 .PHONY: restart-api
-restart-api: ## Restart shelf-api
-	@kubectl rollout restart deployment/shelf-api \
+restart-api: require-local ## Restart local shelf-api
+	@$(KUBECTL) rollout restart deployment/shelf-api \
 		-n $(NAMESPACE)
 
 
 .PHONY: restart-front
-restart-front: ## Restart shelf-front
-	@kubectl rollout restart deployment/shelf-front \
+restart-front: require-local ## Restart local shelf-front
+	@$(KUBECTL) rollout restart deployment/shelf-front \
 		-n $(NAMESPACE)
 
 
 .PHONY: rollout-status
 rollout-status: ## Wait for application rollouts
-	@kubectl rollout status deployment/shelf-auth \
+	@$(KUBECTL) rollout status deployment/shelf-auth \
 		-n $(NAMESPACE)
-	@kubectl rollout status deployment/shelf-api \
+	@$(KUBECTL) rollout status deployment/shelf-api \
 		-n $(NAMESPACE)
-	@kubectl rollout status deployment/shelf-front \
+	@$(KUBECTL) rollout status deployment/shelf-front \
 		-n $(NAMESPACE)
 
 
@@ -253,7 +295,7 @@ rollout-status: ## Wait for application rollouts
 
 .PHONY: logs-auth
 logs-auth: ## Follow shelf-auth logs
-	@kubectl logs \
+	@$(KUBECTL) logs \
 		deployment/shelf-auth \
 		-n $(NAMESPACE) \
 		-f
@@ -261,7 +303,7 @@ logs-auth: ## Follow shelf-auth logs
 
 .PHONY: logs-api
 logs-api: ## Follow shelf-api logs
-	@kubectl logs \
+	@$(KUBECTL) logs \
 		deployment/shelf-api \
 		-n $(NAMESPACE) \
 		-f
@@ -269,7 +311,7 @@ logs-api: ## Follow shelf-api logs
 
 .PHONY: logs-front
 logs-front: ## Follow shelf-front logs
-	@kubectl logs \
+	@$(KUBECTL) logs \
 		deployment/shelf-front \
 		-n $(NAMESPACE) \
 		-f
@@ -281,21 +323,21 @@ logs-front: ## Follow shelf-front logs
 
 .PHONY: port-forward
 port-forward: ## Forward frontend, auth and API ports
-	@echo "Starting Shelf port forwards..."
+	@echo "Starting Shelful port forwards..."
 	@echo "Frontend: http://localhost:$(FRONT_PORT)"
 	@echo "Auth:     http://localhost:$(AUTH_PORT)"
 	@echo "API:      http://localhost:$(API_PORT)"
 	@echo
 	@trap 'kill 0' INT TERM EXIT; \
-		kubectl port-forward \
+		$(KUBECTL) port-forward \
 			service/shelf-front \
 			$(FRONT_PORT):3000 \
 			-n $(NAMESPACE) & \
-		kubectl port-forward \
+		$(KUBECTL) port-forward \
 			service/shelf-auth \
 			$(AUTH_PORT):8080 \
 			-n $(NAMESPACE) & \
-		kubectl port-forward \
+		$(KUBECTL) port-forward \
 			service/shelf-api \
 			$(API_PORT):8082 \
 			-n $(NAMESPACE) & \
@@ -308,35 +350,35 @@ port-forward: ## Forward frontend, auth and API ports
 
 .PHONY: migrations
 migrations: ## Show migration job status
-	@kubectl get jobs -n $(NAMESPACE)
+	@$(KUBECTL) get jobs -n $(NAMESPACE)
 
 
 .PHONY: migration-logs
 migration-logs: ## Show migration job logs
 	@echo "=== shelf-auth migration ==="
-	@kubectl logs job/shelf-auth-migrate \
+	@$(KUBECTL) logs job/shelf-auth-migrate \
 		-n $(NAMESPACE) || true
 
 	@echo
 	@echo "=== shelf-api migration ==="
-	@kubectl logs job/shelf-api-migrate \
+	@$(KUBECTL) logs job/shelf-api-migrate \
 		-n $(NAMESPACE) || true
 
 
 .PHONY: migrations-delete
-migrations-delete: ## Delete migration jobs so they can be recreated
-	@kubectl delete job shelf-auth-migrate \
+migrations-delete: require-local ## Delete local migration jobs so they can be recreated
+	@$(KUBECTL) delete job shelf-auth-migrate \
 		-n $(NAMESPACE) \
 		--ignore-not-found
 
-	@kubectl delete job shelf-api-migrate \
+	@$(KUBECTL) delete job shelf-api-migrate \
 		-n $(NAMESPACE) \
 		--ignore-not-found
 
 
 .PHONY: migrations-rerun
-migrations-rerun: migrations-delete upgrade ## Delete and recreate migration jobs
-	@kubectl get jobs -n $(NAMESPACE)
+migrations-rerun: require-local migrations-delete upgrade ## Delete and recreate local migration jobs
+	@$(KUBECTL) get jobs -n $(NAMESPACE)
 
 
 # =========================================================
@@ -346,14 +388,14 @@ migrations-rerun: migrations-delete upgrade ## Delete and recreate migration job
 .PHONY: local-up
 local-up: minikube-start namespace images-load deploy ## Start and deploy local Shelf
 	@echo
-	@echo "Shelf local Kubernetes environment is deployed."
+	@echo "Shelful local Kubernetes environment is deployed."
 	@echo
 	@$(MAKE) status
 
 .PHONY: local
-local: local-up ## Start full local Shelf environment
+local: local-up ## Start full local Shelful environment
 	@echo
-	@echo "Shelf is running:"
+	@echo "Shelful is running:"
 	@echo "  Frontend: http://localhost:$(FRONT_PORT)"
 	@echo "  Auth:     http://localhost:$(AUTH_PORT)"
 	@echo "  API:      http://localhost:$(API_PORT)"
@@ -364,9 +406,71 @@ local: local-up ## Start full local Shelf environment
 .PHONY: local-update
 local-update: images-load upgrade restart rollout-status ## Reload images and redeploy Shelf
 	@echo
-	@echo "Shelf local deployment updated."
+	@echo "Shelful local deployment updated."
 
 
 .PHONY: local-down
 local-down: ## Stop local Minikube environment
-	@minikube stop --profile $(MINIKUBE_PROFILE)
+	@$(KUBECTL) stop --profile $(MINIKUBE_PROFILE)
+
+
+# =========================================================
+# Terraform
+# =========================================================
+
+.PHONY: tf-init
+tf-init: ## Initialize Terraform
+	@$(TERRAFORM) -chdir=$(TF_DIR) init
+
+
+.PHONY: tf-fmt
+tf-fmt: ## Format Terraform configuration
+	@$(TERRAFORM) -chdir=$(TF_DIR) fmt -recursive
+
+
+.PHONY: tf-fmt-check
+tf-fmt-check: ## Check Terraform formatting
+	@$(TERRAFORM) -chdir=$(TF_DIR) fmt -check -recursive
+
+
+.PHONY: tf-validate
+tf-validate: ## Validate Terraform configuration
+	@$(TERRAFORM) -chdir=$(TF_DIR) validate
+
+
+.PHONY: tf-check
+tf-check: tf-fmt-check tf-validate ## Run Terraform static checks
+
+
+.PHONY: tf-plan
+tf-plan: ## Show Terraform execution plan
+	@$(TERRAFORM) -chdir=$(TF_DIR) plan
+
+
+.PHONY: tf-plan-destroy
+tf-plan-destroy: ## Preview Terraform environment destruction
+	@$(TERRAFORM) -chdir=$(TF_DIR) plan -destroy
+
+
+.PHONY: tf-state
+tf-state: ## List resources managed by Terraform
+	@$(TERRAFORM) -chdir=$(TF_DIR) state list
+
+
+# =========================================================
+# Argo CD
+# =========================================================
+
+.PHONY: argo-status
+argo-status: ## Show Argo CD application status
+	@$(ARGOCD) app get $(ARGO_APP)
+
+
+.PHONY: argo-refresh
+argo-refresh: ## Refresh Argo CD application state
+	@$(ARGOCD) app get $(ARGO_APP) --refresh
+
+
+.PHONY: argo-diff
+argo-diff: ## Show Git vs live Kubernetes differences
+	@$(ARGOCD) app diff $(ARGO_APP)

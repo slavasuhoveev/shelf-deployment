@@ -1,26 +1,274 @@
-# Local Kubernetes Development
+# Shelful Deployment
 
-Shelf can be run locally in a Minikube Kubernetes cluster using Helm.
+Infrastructure and deployment configuration for **Shelful**.
 
-The deployment repository contains the Kubernetes infrastructure for:
+This repository is the deployment source of truth for the Shelful services:
 
-- `shelf-auth`
-- `shelf-api`
-- `shelf-front`
-- PostgreSQL databases
-- database migration jobs
-- Kubernetes Services
-- health/readiness probes
-- Ingress configuration
+- `shelf-auth` — authentication and identity service
+- `shelf-api` — domain and business API
+- `shelf-front` — web application
 
-For local development, service images use the `develop` tag and are loaded
-directly into Minikube.
+It contains:
+
+- Kubernetes manifests packaged with Helm
+- environment-specific Helm configuration
+- Argo CD GitOps configuration
+- Terraform AWS infrastructure configuration
+- local Kubernetes development tooling
+
+Application source code, tests, Dockerfiles, and container image builds live in
+the individual service repositories.
+
+> **Ownership model**
+>
+> Terraform owns cloud infrastructure.  
+> Argo CD owns Kubernetes desired state in cloud environments.  
+> Kubernetes controllers own controller-generated resources.  
+> Git is the source of truth.
 
 ---
 
-## Prerequisites
+## Architecture
 
-The following tools must be installed:
+Shelful deployment is separated into infrastructure and application layers.
+
+```text
+                         GitHub
+                           │
+          ┌────────────────┴────────────────┐
+          │                                 │
+   Service repositories             shelf-deployment
+          │                                 │
+          │ CI                              ├── Terraform
+          ▼                                 │      │
+        GHCR                                │      ▼
+   immutable images                         │     AWS
+          │                                 │
+          │                                 └── Argo CD
+          │                                        │
+          │                                        ▼
+          └──────────────────────────────► Kubernetes
+                                                   │
+                                      ┌────────────┼────────────┐
+                                      ▼            ▼            ▼
+                                  shelf-auth   shelf-api   shelf-front
+```
+
+### Infrastructure layer
+
+Terraform manages AWS infrastructure required by the application.
+
+The development infrastructure includes:
+
+```text
+VPC
+├── Public subnets
+├── Private subnets
+├── Internet Gateway
+├── Route tables
+├── Security Groups
+├── EKS
+│   ├── Managed Node Group
+│   ├── EKS Add-ons
+│   └── Pod Identity
+├── RDS PostgreSQL
+├── IAM roles and policies
+├── ACM
+└── Route 53 integration
+```
+
+Terraform does not deploy Shelful application workloads into Kubernetes.
+
+### Application layer
+
+Argo CD manages the Kubernetes application state using Helm.
+
+```text
+Git
+ ↓
+Argo CD
+ ↓
+Helm
+ ↓
+Kubernetes API
+ ↓
+Deployments / Services / Jobs / Ingress
+```
+
+For cloud environments, Git contains the desired application state.
+
+---
+
+## Repository Structure
+
+```text
+.
+├── argocd/
+│   ├── applications/
+│   │   └── shelf-dev.yaml
+│   └── projects/
+│       └── shelf.yaml
+│
+├── charts/
+│   └── shelf-app/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── ...
+│
+├── environments/
+│   ├── dev/
+│   │   └── values.yaml
+│   └── local/
+│       └── values.yaml
+│
+├── terraform/
+│   └── environments/
+│       └── dev/
+│           ├── *.tf
+│           ├── .terraform.lock.hcl
+│           └── policies/
+│
+└── Makefile
+```
+
+Terraform file names are organizational only.
+
+All `.tf` files inside a Terraform module directory are loaded as one
+configuration.
+
+---
+
+# Deployment Model
+
+## Service CI
+
+Each application repository owns its own CI and Docker image build.
+
+```text
+source code
+    ↓
+tests / lint
+    ↓
+Docker build
+    ↓
+push image
+    ↓
+GHCR
+```
+
+Cloud deployments use immutable Git commit SHA image tags.
+
+Example:
+
+```text
+ghcr.io/slavasuhoveev/shelf-api:<git-sha>
+```
+
+Do not use `latest` for deployed environments.
+
+A running application version must be traceable back to the exact source
+commit that produced its container image.
+
+---
+
+## GitOps Deployment
+
+Application versions are deployed by changing the desired state in Git.
+
+```text
+1. Merge application changes
+          ↓
+2. Service CI builds the image
+          ↓
+3. Image is pushed to GHCR using a Git SHA tag
+          ↓
+4. Update the image tag in environment values
+          ↓
+5. Merge the deployment repository change
+          ↓
+6. Argo CD detects the Git/live-state difference
+          ↓
+7. Review the Argo CD diff
+          ↓
+8. Sync the application
+          ↓
+9. Kubernetes performs the rollout
+```
+
+Example:
+
+```yaml
+shelfApi:
+  image:
+    repository: ghcr.io/slavasuhoveev/shelf-api
+    tag: "<git-sha>"
+```
+
+Changing the image tag in Git is the normal cloud deployment action.
+
+Avoid manual cloud deployment commands such as:
+
+```bash
+kubectl set image ...
+```
+
+Manual live-cluster changes should be exceptional and reconciled back into Git.
+
+---
+
+# Environment Ownership
+
+Local and cloud environments intentionally use different deployment workflows.
+
+## Local
+
+```text
+Make
+ ↓
+Helm
+ ↓
+Minikube
+```
+
+Direct Helm operations are appropriate for the local development environment.
+
+## Dev / Cloud
+
+```text
+Git
+ ↓
+Argo CD
+ ↓
+Helm
+ ↓
+EKS
+```
+
+Application changes in cloud environments should go through Git and Argo CD
+rather than direct Helm mutations.
+
+## AWS Infrastructure
+
+```text
+Terraform
+ ↓
+AWS Provider
+ ↓
+AWS API
+ ↓
+Infrastructure
+```
+
+Terraform is responsible for the lifecycle of Terraform-managed cloud
+infrastructure.
+
+---
+
+# Local Development
+
+Shelful can be run locally in Minikube.
+
+Prerequisites:
 
 - Docker
 - kubectl
@@ -28,31 +276,7 @@ The following tools must be installed:
 - Minikube
 - Make
 
-Verify the installation:
-
-```bash
-docker --version
-kubectl version --client
-helm version
-minikube version
-make --version
-```
-
-Docker must be running:
-
-```bash
-docker info
-```
-
----
-
-# Quick Start
-
-## 1. Build service images
-
-Images are built in their respective repositories.
-
-Expected local images:
+Application images use the local `develop` tag:
 
 ```text
 ghcr.io/slavasuhoveev/shelf-auth:develop
@@ -60,44 +284,25 @@ ghcr.io/slavasuhoveev/shelf-api:develop
 ghcr.io/slavasuhoveev/shelf-front:develop
 ```
 
-Build the latest versions before starting the local Kubernetes environment.
+The deployment repository does not build application images.
 
-The deployment repository does not build application images itself.
-Each service owns its Docker build process.
+Build changed images in their respective service repositories first.
 
----
-
-## 2. Bootstrap the auth signing key
+## Initial setup
 
 `shelf-auth` requires an RSA private key for signing JWTs.
 
-This is normally required only during the initial local environment setup.
-
-Generate the key from the `shelf-auth` repository:
-
-```bash
-openssl genpkey \
-  -algorithm RSA \
-  -pkeyopt rsa_keygen_bits:2048 \
-  -out devkeys/k1-2025-08-30.pem
-```
-
-The filename must correspond to the configured:
-
-```text
-SIGNING_KEY_KID=k1-2025-08-30
-```
-
 The private key must never be committed to Git.
 
-Start Minikube and create the namespace:
+After generating the local signing key in the `shelf-auth` repository, start
+Minikube and create the namespace:
 
 ```bash
 make minikube-start
 make namespace
 ```
 
-Create the Kubernetes Secret:
+Create the local Kubernetes signing-key Secret:
 
 ```bash
 kubectl create secret generic shelf-auth-keys \
@@ -105,81 +310,15 @@ kubectl create secret generic shelf-auth-keys \
   -n shelf-local
 ```
 
-Adjust the path to the `shelf-auth` repository if necessary.
+Adjust the path and key identifier when necessary.
 
-Verify:
-
-```bash
-kubectl get secret shelf-auth-keys -n shelf-local
-```
-
-The key is mounted inside `shelf-auth` at:
-
-```text
-/run/secrets/keys
-```
-
----
-
-## 3. Start Shelf
-
-After the initial secret bootstrap, the normal local startup is:
+## Start Shelful locally
 
 ```bash
-make local-up
+make local
 ```
 
-This performs:
-
-```text
-start Minikube
-       ↓
-create/verify namespace
-       ↓
-load local develop images into Minikube
-       ↓
-lint Helm chart
-       ↓
-helm upgrade --install
-       ↓
-show Kubernetes status
-```
-
-Check that all application and database Pods are running:
-
-```bash
-make pods
-```
-
-A healthy environment should look similar to:
-
-```text
-shelf-api-...       1/1   Running
-shelf-api-db-0      1/1   Running
-shelf-auth-...      1/1   Running
-shelf-auth-db-0     1/1   Running
-shelf-front-...     1/1   Running
-```
-
-Migration Jobs should be complete:
-
-```bash
-make migrations
-```
-
----
-
-# Access Shelf
-
-For local development, Shelf uses `localhost` through Kubernetes port forwarding.
-
-Start all port forwards:
-
-```bash
-make port-forward
-```
-
-This exposes:
+This starts the local Kubernetes environment and exposes:
 
 ```text
 Frontend: http://localhost:3000
@@ -187,474 +326,711 @@ Auth:     http://localhost:8081
 API:      http://localhost:8082
 ```
 
-Open:
+Alternatively, deploy without starting port forwarding:
 
-```text
-http://localhost:3000
+```bash
+make local-up
 ```
 
-Keep `make port-forward` running while using the application.
+Then start forwarding separately:
 
-Stop the port forwards with:
-
-```text
-Ctrl+C
+```bash
+make port-forward
 ```
 
-The request flow is:
+## Update local application images
 
-```text
-Browser
-   │
-   ├── localhost:3000
-   │        ↓
-   │   port-forward
-   │        ↓
-   │   shelf-front Service
-   │        ↓
-   │   shelf-front Pod
-   │
-   ├── localhost:8081
-   │        ↓
-   │   port-forward
-   │        ↓
-   │   shelf-auth Service
-   │        ↓
-   │   shelf-auth Pod
-   │
-   └── localhost:8082
-            ↓
-       port-forward
-            ↓
-       shelf-api Service
-            ↓
-       shelf-api Pod
-```
-
-Communication between backend services does not use `localhost`.
-
-Inside Kubernetes, services communicate through Kubernetes DNS, for example:
-
-```text
-shelf-api
-    ↓
-http://shelf-auth:8080
-```
-
-Databases are accessed in the same way through their Kubernetes Services.
-
----
-
-# Updating the Local Environment
-
-## Application code changes
-
-After changing one of the services:
-
-1. Rebuild its `develop` Docker image in the service repository.
-2. Return to `shelf-deployment`.
-3. Reload the images and update the deployment:
+After rebuilding one or more service images:
 
 ```bash
 make local-update
 ```
 
-`local-update` performs:
+This reloads the local images into Minikube, upgrades the Helm release,
+restarts application Deployments, and waits for rollout completion.
+
+## Local configuration
+
+Base Helm configuration:
 
 ```text
-load local images
-       ↓
-helm upgrade
-       ↓
-restart application Deployments
-       ↓
-wait for rollout
+charts/shelf-app/values.yaml
 ```
 
-Check the result:
+Local overrides:
 
-```bash
-make pods
+```text
+environments/local/values.yaml
+```
+
+Dev overrides:
+
+```text
+environments/dev/values.yaml
+```
+
+Conceptually:
+
+```text
+charts/shelf-app/values.yaml
+              +
+environment values
+              ↓
+rendered Kubernetes manifests
 ```
 
 ---
 
-## Helm changes
+# Helm
 
-After changing templates or values, first validate them:
+The `shelf-app` chart describes the Kubernetes application.
+
+Environment-independent Kubernetes structure belongs in the chart.
+
+Environment-specific configuration belongs in environment values.
+
+Validate Helm changes with:
 
 ```bash
 make lint
 ```
 
-Optionally inspect the generated Kubernetes manifests:
+Inspect rendered manifests with:
 
 ```bash
 make template
 ```
 
-Then apply the changes:
+Typical environment-specific values include:
 
-```bash
-make upgrade
+- image tags
+- replica counts
+- hostnames
+- CORS origins
+- resource configuration
+- environment-specific feature switches
+
+Secrets must not be committed to Helm values.
+
+---
+
+# Argo CD
+
+Argo CD compares the desired state stored in Git with the live Kubernetes
+state.
+
+```text
+Desired State (Git)
+        ↕
+Live State (Kubernetes)
 ```
 
-Check:
+Application definitions live under:
+
+```text
+argocd/applications/
+```
+
+Project-level configuration lives under:
+
+```text
+argocd/projects/
+```
+
+Typical application states:
+
+```text
+Synced
+```
+
+Git and Kubernetes match.
+
+```text
+OutOfSync
+```
+
+The live cluster differs from the desired state in Git.
+
+```text
+Healthy
+```
+
+The application resources are operational according to Argo CD health
+evaluation.
+
+The development environment currently uses manual synchronization:
+
+```text
+Git change
+    ↓
+Argo CD detects OutOfSync
+    ↓
+Review Diff
+    ↓
+Sync
+    ↓
+Synced / Healthy
+```
+
+Useful inspection commands:
 
 ```bash
-make status
+make argo-status
+make argo-refresh
+make argo-diff
+```
+
+Synchronization is intentionally explicit:
+
+```bash
+argocd app sync shelf-dev
 ```
 
 ---
 
-# Useful Commands
+# Kubernetes and Controller Ownership
 
-Show all available Make commands:
+Avoid having multiple systems independently manage the same resource.
 
-```bash
-make help
+The ownership model is:
+
+```text
+Terraform
+    │
+    └── Cloud infrastructure
+
+Argo CD + Helm
+    │
+    └── Kubernetes desired state
+
+Kubernetes controllers
+    │
+    └── Controller-generated resources
 ```
 
-Show the complete local Kubernetes status:
+For example:
 
-```bash
-make status
+```text
+Helm
+ ↓
+Kubernetes Ingress
+ ↓
+AWS Load Balancer Controller
+ ↓
+AWS ALB / Target Groups / related resources
 ```
 
-Show Pods:
+The AWS Load Balancer Controller is part of the control path.
 
-```bash
-make pods
+External HTTP requests do not pass through the controller.
+
+The application request path is:
+
+```text
+Internet
+   ↓
+Route 53
+   ↓
+ALB
+   ↓
+Target
+   ↓
+Kubernetes Service
+   ↓
+Pod
 ```
 
-Watch Pods:
+Controller-generated ALBs and Target Groups should not be independently
+managed by Terraform.
 
-```bash
-make pods-watch
+---
+
+# Database Migrations
+
+Database migrations run as Kubernetes Jobs.
+
+Current migration jobs exist for:
+
+```text
+shelf-auth
+shelf-api
 ```
 
-Show Services:
-
-```bash
-make services
-```
-
-Show PVCs:
-
-```bash
-make pvc
-```
-
-Show migration Jobs:
+Inspect them with:
 
 ```bash
 make migrations
 ```
 
-Follow application logs:
-
-```bash
-make logs-auth
-make logs-api
-make logs-front
-```
-
-Restart an individual service:
-
-```bash
-make restart-auth
-make restart-api
-make restart-front
-```
-
-Restart all application Deployments:
-
-```bash
-make restart
-```
-
-Wait for all application rollouts:
-
-```bash
-make rollout-status
-```
-
-Show Helm release status:
-
-```bash
-make helm-status
-```
-
----
-
-# Debugging
-
-If a Pod is crashing:
-
-```bash
-kubectl get pods -n shelf-local
-```
-
-Inspect it:
-
-```bash
-kubectl describe pod <pod-name> -n shelf-local
-```
-
-Read the current logs:
-
-```bash
-kubectl logs <pod-name> -n shelf-local
-```
-
-If Kubernetes has already restarted the container, inspect the previous instance:
-
-```bash
-kubectl logs <pod-name> -n shelf-local --previous
-```
-
-This is particularly useful for `CrashLoopBackOff`.
-
-Check migration logs:
+Inspect migration logs with:
 
 ```bash
 make migration-logs
 ```
 
-Check that the auth signing key is mounted:
+Kubernetes Job templates are immutable.
 
-```bash
-kubectl exec -it deployment/shelf-auth -n shelf-local -- \
-  ls -la /run/secrets/keys
-```
+Cloud GitOps deployments should eventually use an explicit migration lifecycle,
+such as Argo CD hooks, so migrations run before an incompatible application
+version is rolled out.
 
----
-
-# Helm Configuration
-
-The base configuration is stored in:
-
-```text
-charts/shelf-app/values.yaml
-```
-
-Environment-specific overrides are stored in:
-
-```text
-environments/local/values.yaml
-environments/dev/values.yaml
-```
-
-For the local environment Helm effectively combines:
-
-```text
-charts/shelf-app/values.yaml
-              +
-environments/local/values.yaml
-              ↓
-final Kubernetes manifests
-```
-
-The rendered configuration can be inspected with:
-
-```bash
-make template
-```
+This improvement is tracked separately from the current deployment setup.
 
 ---
 
-# Local Images
+# Secrets
 
-The local environment uses:
+Secrets must never be committed to Git in plaintext.
+
+This includes:
+
+- database passwords
+- JWT signing private keys
+- API tokens
+- GitHub credentials
+- AWS credentials
+
+Kubernetes `Secret` resources must not be treated as a safe mechanism for
+storing plaintext credentials in Git.
+
+A dedicated secret-management solution should be introduced before production.
+
+Possible approaches include:
+
+- AWS Secrets Manager
+- External Secrets Operator
+- SOPS
+- Sealed Secrets
+
+---
+
+# AWS Authentication
+
+Human and workload access must remain separate.
+
+Human access:
 
 ```text
-:develop
+Developer
+    ↓
+IAM Identity Center
+    ↓
+IAM Role
+    ↓
+temporary AWS credentials
 ```
 
-images.
+Kubernetes workload access:
+
+```text
+Kubernetes ServiceAccount
+        ↓
+EKS Pod Identity
+        ↓
+IAM Role
+        ↓
+AWS API
+```
+
+Future CI infrastructure access should use:
+
+```text
+GitHub Actions
+      ↓
+OIDC
+      ↓
+IAM Role
+      ↓
+temporary AWS credentials
+```
+
+Long-lived AWS access keys should not be introduced where workload identity
+can be used instead.
+
+---
+
+# Terraform
+
+Terraform configuration for the AWS development environment lives under:
+
+```text
+terraform/environments/dev/
+```
+
+The initial Terraform configuration was created by adopting the manually
+provisioned AWS development infrastructure.
+
+The normal validation workflow is:
+
+```bash
+terraform init
+terraform fmt -check -recursive
+terraform validate
+terraform plan
+```
+
+Equivalent Make targets are provided where appropriate:
+
+```bash
+make tf-init
+make tf-fmt
+make tf-fmt-check
+make tf-validate
+make tf-check
+make tf-plan
+```
+
+Always review a Terraform plan before applying infrastructure changes.
+
+For destructive operations, inspect:
+
+```bash
+make tf-plan-destroy
+```
+
+before explicitly running Terraform destruction.
+
+---
+
+## Terraform State
+
+Terraform state maps Terraform resource addresses to real infrastructure.
+
+```text
+Terraform Configuration
+        │
+        │ desired state
+        ▼
+Terraform
+        │
+        ├──── Terraform State
+        │
+        ▼
+Cloud Provider API
+        │
+        ▼
+Actual Infrastructure
+```
+
+Terraform state must never be committed to Git.
+
+Ignore:
+
+```gitignore
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+```
+
+Commit:
+
+```text
+.terraform.lock.hcl
+```
+
+The provider lock file is part of the reproducible Terraform configuration.
+
+The current development setup uses local Terraform state.
+
+A remote backend with state locking and appropriate access controls should be
+introduced before collaborative or production infrastructure management.
+
+---
+
+## Existing Infrastructure Adoption
+
+Existing infrastructure can be adopted into Terraform using import.
+
+The safe workflow is:
+
+```text
+1. Describe the existing resource in Terraform
+2. Import the real resource into Terraform state
+3. Run terraform plan
+4. Reconcile configuration differences
+5. Repeat until the plan is clean
+```
+
+The target after adoption is:
+
+```text
+Plan: 0 to add, 0 to change, 0 to destroy.
+```
+
+Do not blindly apply Terraform immediately after importing existing
+infrastructure.
+
+---
+
+# Infrastructure Lifecycle
+
+Normal infrastructure changes should follow:
+
+```text
+Terraform code change
+        ↓
+terraform fmt
+        ↓
+terraform validate
+        ↓
+terraform plan
+        ↓
+review
+        ↓
+terraform apply
+```
+
+Once a resource is Terraform-managed, AWS Console changes should not be the
+normal management workflow.
+
+Manual changes can introduce infrastructure drift:
+
+```text
+Terraform desired state
+        ≠
+AWS actual state
+```
+
+Emergency manual changes should be reconciled back into Terraform.
+
+---
+
+# Infrastructure Teardown
+
+Environment destruction requires additional care because some AWS resources
+can be owned by Kubernetes controllers rather than directly by Terraform.
 
 For example:
 
 ```text
-ghcr.io/slavasuhoveev/shelf-auth:develop
-ghcr.io/slavasuhoveev/shelf-api:develop
-ghcr.io/slavasuhoveev/shelf-front:develop
+Delete Kubernetes Ingress
+        ↓
+AWS Load Balancer Controller
+        ↓
+delete ALB / Target Groups
+        ↓
+verify controller cleanup
+        ↓
+Terraform destroy
 ```
 
-Minikube uses its own container runtime/image store.
+Do not delete the EKS cluster first when Kubernetes controllers still own
+external AWS resources that require controller cleanup.
 
-Therefore, an image built by the host Docker daemon is not automatically
-available to Kubernetes running inside Minikube.
+Before destroying RDS, explicitly decide whether a final database snapshot is
+required.
 
-The Makefile handles loading the local images with:
+Always review:
 
 ```bash
-make images-load
+make tf-plan-destroy
 ```
 
-To inspect the Shelf images available inside Minikube:
+before destruction.
+
+After destruction:
 
 ```bash
-make images-list
+make tf-state
 ```
 
-The local Helm configuration uses:
+should show no Terraform-managed resources for a fully removed environment.
 
-```yaml
-image:
-  tag: develop
-  pullPolicy: IfNotPresent
+Terraform success does not replace a cloud-resource audit.
+
+Verify at minimum:
+
+```text
+EKS
+EC2
+RDS
+Load Balancers
+Target Groups
+NAT Gateways
+EBS volumes
+Elastic IPs
+VPC
 ```
 
-This allows Kubernetes to use images loaded directly into Minikube instead of
-requiring them to be pulled from GHCR.
+Verify intentionally preserved resources separately.
 
 ---
 
-# Ingress
+# DNS and Domain Lifecycle
 
-The Helm chart contains Ingress support.
-
-For example, a local Ingress can expose:
-
-```text
-front.shelf.local
-auth.shelf.local
-api.shelf.local
-```
-
-The Minikube nginx ingress controller can be enabled with:
-
-```bash
-minikube addons enable ingress
-```
-
-Check it with:
-
-```bash
-kubectl get pods -n ingress-nginx
-```
-
-The Ingress itself can be inspected with:
-
-```bash
-kubectl get ingress -n shelf-local
-```
-
-However, the normal local browser workflow currently uses `localhost`
-and port forwarding instead of the HTTP Ingress hostnames.
-
-## Why localhost is used locally
-
-Some browser APIs are available only in a secure context.
-
-For example:
-
-```javascript
-crypto.randomUUID()
-```
-
-is available on HTTPS pages.
-
-Browsers also treat `localhost` as a special secure-context exception for
-local development.
-
-Therefore:
+Domain registration, authoritative DNS, and application hosting are separate
+concerns.
 
 ```text
-http://localhost:3000
+Registrar
+    ↓
+Domain
+    ↓
+Authoritative DNS
+    ↓
+Application endpoint
 ```
 
-can use these APIs, while plain HTTP on:
+The `shelful.club` domain registration and its Route 53 Hosted Zone are
+intentionally preserved independently from the disposable development
+environment.
 
-```text
-http://front.shelf.local
-```
-
-is not considered a secure context.
-
-For this reason the current local environment uses:
-
-```text
-http://localhost:3000
-http://localhost:8081
-http://localhost:8082
-```
-
-The future `dev` environment will use real domains with TLS:
-
-```text
-LOCAL
-  localhost
-  + port-forward
-
-DEV
-  real domains
-  + Ingress
-  + HTTPS/TLS
-```
+This allows application infrastructure to be destroyed or moved to another
+cloud provider without losing the domain.
 
 ---
 
-# Stop the Environment
+# Useful Commands
 
-Stop Minikube while preserving the cluster:
+Show all available Make targets:
 
 ```bash
-make local-down
+make help
 ```
 
-or:
+## Local Kubernetes
 
 ```bash
-make minikube-stop
-```
-
-Start it again later:
-
-```bash
-make minikube-start
-```
-
-To completely delete the local cluster:
-
-```bash
-make minikube-delete
-```
-
-Deleting Minikube removes the local Kubernetes cluster and its local
-Kubernetes state, so it should not be part of the normal development workflow.
-
----
-
-# Typical Local Workflow
-
-After the initial setup, normal development should require only:
-
-```bash
-# Build changed service images in their respective repositories.
-
-# Start/update Kubernetes environment:
+make local
 make local-up
-
-# Expose Shelf to the host:
-make port-forward
-```
-
-After rebuilding application images:
-
-```bash
 make local-update
-```
+make local-down
 
-For troubleshooting:
-
-```bash
 make status
+make pods
+make pods-watch
+make services
+make pvc
+
 make logs-auth
 make logs-api
 make logs-front
+
+make migrations
+make migration-logs
 ```
 
-The goal is for application repositories to own application builds, while
-`shelf-deployment` owns the local Kubernetes deployment lifecycle.
+## Helm
+
+```bash
+make lint
+make template
+make helm-status
+```
+
+## Terraform
+
+```bash
+make tf-init
+make tf-fmt
+make tf-fmt-check
+make tf-validate
+make tf-check
+make tf-plan
+make tf-plan-destroy
+make tf-state
+```
+
+## Argo CD
+
+```bash
+make argo-status
+make argo-refresh
+make argo-diff
+```
+
+Important state-changing operations remain explicit where appropriate.
+
+---
+
+# Operational Principles
+
+1. **Git is the source of truth for cloud application deployments.**
+2. **Application images use immutable Git SHA tags in cloud environments.**
+3. **Terraform owns Terraform-managed cloud infrastructure.**
+4. **Argo CD and Helm own Kubernetes desired state in cloud environments.**
+5. **Kubernetes controllers own controller-generated resources.**
+6. **Direct Helm deployment is intended for local development, not normal cloud deployment.**
+7. **Secrets are never committed in plaintext.**
+8. **Terraform plans are reviewed before infrastructure changes.**
+9. **Argo CD diffs are reviewed before manual synchronization.**
+10. **Manual cloud and cluster changes are exceptional and must be reconciled into code.**
+11. **Destructive operations require explicit review and post-destroy verification.**
+12. **Infrastructure and deployments should be reproducible from version-controlled configuration.**
+
+---
+
+# Known Technical Debt / TODO
+
+The initial Terraform configuration was created by adopting the first manually
+provisioned AWS development environment.
+
+Before recreating the next AWS development environment:
+
+- [ ] Refactor Terraform for clean environment bootstrap and remove dependencies
+      on resources and identifiers from the previously imported environment.
+
+The refactoring is tracked as a separate infrastructure task.
+
+Additional production-hardening work will be documented and tracked separately.
+
+---
+
+# Future Improvements
+
+Potential future infrastructure improvements include:
+
+- clean Terraform bootstrap from an empty environment
+- remote Terraform state and state locking
+- Terraform CI (`fmt`, `validate`, `plan`)
+- GitHub Actions OIDC for Terraform
+- dedicated secret management
+- ExternalDNS evaluation/integration
+- automatic Argo CD synchronization where appropriate
+- Argo CD migration hooks
+- service-specific ALB health checks
+- Kubernetes resource requests and limits
+- PodDisruptionBudgets where required
+- observability and alerting
+- database backup and restore strategy
+- environment/account separation
+- least-privilege IAM hardening
+- restricted EKS API access
+- production-grade network topology
+- reusable Terraform modules where genuine reuse appears
+
+---
+
+# Responsibility Summary
+
+| Layer | Tool | Responsibility |
+|---|---|---|
+| Application source | GitHub | Service source code |
+| CI | GitHub Actions | Test, build, publish images |
+| Container registry | GHCR | Immutable application images |
+| Deployment configuration | Git | Desired deployment state |
+| Kubernetes packaging | Helm | Render Kubernetes manifests |
+| GitOps | Argo CD | Reconcile Git with Kubernetes |
+| Orchestration | Kubernetes | Run application workloads |
+| Cloud infrastructure | Terraform | Provision AWS infrastructure |
+| Cloud platform | AWS | EKS, RDS, networking, IAM |
+| External HTTP entry | ALB | Route traffic into Kubernetes |
+| DNS | Route 53 | Resolve application hostnames |
+
+---
+
+# Core Principle
+
+```text
+Application code
+      +
+Deployment configuration
+      +
+Infrastructure configuration
+      =
+Reproducible environment
+```
+
+The cloud console is an operational and diagnostic interface.
+
+It is not the source of truth.

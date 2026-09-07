@@ -54,7 +54,7 @@ body:
       description: Which services/components are affected?
       placeholder: |
         - Auth Service:
-        - Shelf API:
+        - Shelful API:
         - Frontend:
         - Infrastructure:
         - External services:
